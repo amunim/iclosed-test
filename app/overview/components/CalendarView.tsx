@@ -1,14 +1,17 @@
 'use client';
 
-import { useCalendarStore, useAvailabilityStore } from '@/lib/store';
+import { useCalendarStore, useAvailabilityStore, useEventsStore } from '@/lib/store';
 import { format, addDays } from 'date-fns';
 import { differenceInCalendarDays } from 'date-fns';
 import { useMemo } from 'react';
 import { getUnavailabilityInfo } from '@/lib/utils/calendar';
+import { getEventsInSlot } from '@/lib/utils/events';
+import { EventCard } from '@/components/EventCard';
 
 export default function CalendarView() {
-    const { startDate, endDate } = useCalendarStore();
+    const { startDate, endDate, timezone } = useCalendarStore();
     const { weekDays, blockedTimes } = useAvailabilityStore();
+    const { events } = useEventsStore();
     const timeSlots = Array.from({ length: 24 }, (_, i) => i + 9);
     const daysCount = useMemo(() =>
         startDate && endDate
@@ -69,23 +72,23 @@ export default function CalendarView() {
 
                             {/* Day cells */}
                             {days.map((day, dayIndex) => {
-                                const unavailabilityInfo = getUnavailabilityInfo(day, hour-1, weekDays, blockedTimes);
+                                const unavailabilityInfo = getUnavailabilityInfo(day, hour - 1, weekDays, blockedTimes);
                                 const colorClass = 'bg-white';
+                                const eventsInSlot = getEventsInSlot(events, day, hour, timezone);
 
                                 return (
                                     <div
                                         key={`${hour}-${dayIndex}`}
-                                        className={`min-w-42 h-12 p-1 border-b border-r border-gray-300 flex-1 ${colorClass} relative`}
+                                        className={`min-w-42 h-12 p-1 pl-0 border-b border-r border-gray-300 flex-1 ${colorClass} relative`}
                                     >
                                         {/* Gray overlay for unavailable time */}
                                         {unavailabilityInfo.percentage > 0 && (
-                                            <div 
-                                                className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 ${
-                                                    (unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime) 
-                                                        ? 'diagonal-lines' 
-                                                        : ''
-                                                }`}
-                                                style={{ 
+                                            <div
+                                                className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 ${(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime)
+                                                    ? 'diagonal-lines'
+                                                    : ''
+                                                    }`}
+                                                style={{
                                                     height: `${unavailabilityInfo.percentage}%`,
                                                     width: '100%',
                                                     ...(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime) && {
@@ -100,7 +103,36 @@ export default function CalendarView() {
                                                 }}
                                             />
                                         )}
-                                        {/* Cell content can go here */}
+                                        {/* Event cards */}
+                                        {eventsInSlot.map((eventInfo, eventIndex) => {
+                                            const topOffset = unavailabilityInfo.percentage > 0
+                                                ? unavailabilityInfo.percentage
+                                                : 0;
+
+                                            const availableHeight = 100 - unavailabilityInfo.percentage;
+                                            const eventHeight = (eventInfo.heightPercentage / 100) * availableHeight;
+                                            const showText = eventInfo.position === 'start' || eventInfo.position === 'full';
+                                            if (topOffset == 100)
+                                                return <></>;
+
+                                            return (
+                                                <div
+                                                    key={`${eventInfo.event.id}-${eventIndex}`}
+                                                    className="absolute inset-x-1 z-10"
+                                                    style={{
+                                                        top: (topOffset + (showText ? 0 : -1)) + '%',
+                                                        height: `${eventHeight}%`,
+                                                        left: 0,
+                                                        borderTopLeftRadius: eventInfo.position === 'start' || eventInfo.position === 'full' ? '6px' : '0',
+                                                        borderTopRightRadius: eventInfo.position === 'start' || eventInfo.position === 'full' ? '6px' : '0',
+                                                        borderBottomLeftRadius: eventInfo.position === 'end' || eventInfo.position === 'full' ? '6px' : '0',
+                                                        borderBottomRightRadius: eventInfo.position === 'end' || eventInfo.position === 'full' ? '6px' : '0',
+                                                    }}
+                                                >
+                                                    <EventCard event={eventInfo.event} showText={showText} />
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 );
                             })}
