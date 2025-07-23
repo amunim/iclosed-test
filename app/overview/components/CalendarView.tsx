@@ -3,14 +3,18 @@
 import { useCalendarStore, useAvailabilityStore, useEventsStore } from '@/lib/store';
 import { format, addDays } from 'date-fns';
 import { differenceInCalendarDays } from 'date-fns';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { getUnavailabilityInfo } from '@/lib/utils/calendar';
 import { getEventsInSlot } from '@/lib/utils/events';
 import { EventCard } from '@/components/EventCard';
+import { useDraggable } from "react-use-draggable-scroll";
 
 export default function CalendarView() {
     const { startDate, endDate, timezone } = useCalendarStore();
     const { weekDays, blockedTimes } = useAvailabilityStore();
+    const ref = useRef<HTMLDivElement>(null) as React.MutableRefObject<HTMLDivElement>;
+    const { events: dragEvents } = useDraggable(ref);
+
     const { events } = useEventsStore();
     const timeSlots = Array.from({ length: 24 }, (_, i) => i + 9);
     const daysCount = useMemo(() =>
@@ -21,18 +25,28 @@ export default function CalendarView() {
         addDays(startDate || new Date(), i)
     );
 
+    // Current time indicator logic
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTimePercentage = (currentMinutes / 60) * 100; // Percentage of the hour passed
+    const todayIndex = days.findIndex(day => 
+        format(day, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd')
+    );
+    const shouldShowCurrentTimeIndicator = todayIndex !== -1 && currentHour >= 9 && currentHour < 33;
+
     return (
         <div>
             <div className="relative">
-                <div className="absolute top-0 left-0 overflow-hidden bg-white">
+                <div className="absolute top-0 left-0 overflow-hidden bg-white z-20">
                     <div className="flex flex-col sticky">
-                        <div className="h-10 min-w-20 p-2 border-b border-gray-300 sticky top-0 left-0 bg-white z-20"></div> {/* Top-left empty cell */}
+                        <div className="h-12 min-w-20 p-2 border-b border-gray-300 sticky top-0 left-0 bg-white z-20"></div> {/* Top-left empty cell */}
 
                         {/* Time rows */}
                         {timeSlots.map((hour) => (
-                            <div key={hour} className="flex w-20 h-12">
+                            <div key={hour} className="flex w-20 h-16">
                                 {/* Time column */}
-                                <div className="w-20 border-gray-300 border-r text-sm font-medium text-gray-600 flex items-center justify-end -mb-12 sticky left-0 z-20">
+                                <div className="w-20 border-gray-300 border-r text-sm font-medium text-gray-600 flex items-center justify-end -mb-16 sticky left-0 z-20">
                                     {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}&nbsp;&nbsp;&nbsp;
                                     <div className='w-4'>
                                         <svg className="text-gray-600" width="100%" height="1" xmlns="http://www.w3.org/2000/svg">
@@ -46,21 +60,33 @@ export default function CalendarView() {
                 </div>
             </div>
             {/* Horizontal scroll */}
-            <div className='overflow-x-auto'>
+            <div className='overflow-x-auto scrollbar-hide'
+                ref={ref}
+                {...dragEvents}>
                 <div className="flex flex-col">
                     {/* Header row */}
                     <div className="flex">
                         {/* Empty first cell */}
-                        <div className="min-w-20 w-20 h-10 p-2 border-l border-gray-300 top-0 left-0 bg-white -z-10"></div>
+                        <div className="min-w-20 w-20 h-12 p-2 border-l border-gray-300 top-0 left-0 bg-white -z-10"></div>
 
-                        {days.map((day, index) => (
-                            <div
-                                key={index}
-                                className="h-10 min-w-42 p-2 border-b border-r border-gray-300 text-center flex-1 text-black sticky top-0 bg-white z-10"
-                            >
-                                {format(day, 'EEE dd').toUpperCase()}
-                            </div>
-                        ))}
+                        {days.map((day, index) => {
+                            const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                            const dayText = format(day, 'EEE dd').toUpperCase();
+                            const [dayName, dayNumber] = dayText.split(' ');
+                            
+                            return (
+                                <div
+                                    key={index}
+                                    className={`h-12 min-w-42 p-2 border-b border-r border-gray-300 text-center flex-1 top-0 bg-white z-10 ${isToday ? 'text-blue-600' : 'text-black'}`}
+                                >
+                                    {dayName} {isToday ? (
+                                        <span className="bg-blue-100 rounded-full py-1 px-2 inline-block">
+                                            {dayNumber}
+                                        </span>
+                                    ) : dayNumber}
+                                </div>
+                            );
+                        })}
                     </div>
 
 
@@ -79,12 +105,12 @@ export default function CalendarView() {
                                 return (
                                     <div
                                         key={`${hour}-${dayIndex}`}
-                                        className={`min-w-42 h-12 p-1 pl-0 border-b border-r border-gray-300 flex-1 ${colorClass} relative`}
+                                        className={`min-w-42 h-16 p-1 pl-0 border-b border-r border-gray-300 flex-1 ${colorClass} relative z-0`}
                                     >
                                         {/* Gray overlay for unavailable time */}
                                         {unavailabilityInfo.percentage > 0 && (
                                             <div
-                                                className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 ${(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime)
+                                                className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 -z-10 ${(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime)
                                                     ? 'diagonal-lines'
                                                     : ''
                                                     }`}
@@ -113,7 +139,7 @@ export default function CalendarView() {
                                             const eventHeight = (eventInfo.heightPercentage / 100) * availableHeight;
                                             const showText = eventInfo.position === 'start' || eventInfo.position === 'full';
                                             if (topOffset == 100)
-                                                return <></>;
+                                                return null;
 
                                             return (
                                                 <div
@@ -133,6 +159,26 @@ export default function CalendarView() {
                                                 </div>
                                             );
                                         })}
+                                        
+                                        {/* Current time indicator */}
+                                        {shouldShowCurrentTimeIndicator && 
+                                         dayIndex === todayIndex && 
+                                         hour === currentHour && (
+                                            <div
+                                                className="absolute z-20"
+                                                style={{
+                                                    top: `${currentTimePercentage}%`,
+                                                    left: 0,
+                                                    right: 0,
+                                                    transform: 'translateY(-50%)'
+                                                }}
+                                            >
+                                                <svg width="132" height="8" viewBox="0 0 132 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <circle cx="4" cy="4" r="4" fill="#E02424"/>
+                                                    <path d="M8 4H131" stroke="#E02424" strokeWidth="2" strokeLinecap="round"/>
+                                                </svg>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

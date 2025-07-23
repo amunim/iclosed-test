@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCalendarStore } from '@/lib/store'
 import { SelectRangeEventHandler } from 'react-day-picker'
 import TimezoneSelect from '@/components/TimezoneSelect'
+import { addDays, subDays } from 'date-fns'
 
 export default function CalendarDateRangeHeader() {
     const { startDate, endDate, setStartDate, setEndDate } = useCalendarStore()
@@ -21,6 +22,24 @@ export default function CalendarDateRangeHeader() {
         setEndDate(nextRange?.to);
     };
 
+    const handlePreviousWeek = () => {
+        if (startDate) {
+            setStartDate(subDays(startDate, 7));
+        }
+        if (endDate) {
+            setEndDate(subDays(endDate, 7));
+        }
+    };
+
+    const handleNextWeek = () => {
+        if (startDate) {
+            setStartDate(addDays(startDate, 7));
+        }
+        if (endDate) {
+            setEndDate(addDays(endDate, 7));
+        }
+    };
+
     return (
         <header className="flex h-[66px] items-center justify-between border-b px-4 border-l bg-white w-full">
             {/* Left: Month + Year */}
@@ -30,7 +49,12 @@ export default function CalendarDateRangeHeader() {
                 </strong>
 
                 <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" className='border border-gray-300 !px-[0.3rem] cursor-pointer'>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className='border border-gray-300 !px-[0.3rem] cursor-pointer'
+                        onClick={handlePreviousWeek}
+                    >
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <Popover>
@@ -51,7 +75,12 @@ export default function CalendarDateRangeHeader() {
                             />
                         </PopoverContent>
                     </Popover>
-                    <Button variant="ghost" size="sm" className='border border-gray-300 !px-[0.3rem] cursor-pointer'>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className='border border-gray-300 !px-[0.3rem] cursor-pointer'
+                        onClick={handleNextWeek}
+                    >
                         <ChevronRight className="h-4 w-4" />
                     </Button>
                 </div>

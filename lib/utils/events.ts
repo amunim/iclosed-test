@@ -9,6 +9,10 @@ export interface Event {
     description?: string; // Optional description of the event
     isDeleted?: boolean; // Flag to mark the event as deleted
     meetingLink?: string; // Optional link for virtual meetings
+    host: string;
+    hostEmail: string;
+    invitee: string;
+    inviteeEmail: string;
 }
 
 // Helper function to generate random dates
@@ -192,7 +196,11 @@ export const generateRandomEvents = (): Event[] => {
                 color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
                 status: EVENT_STATUSES[Math.floor(Math.random() * EVENT_STATUSES.length)],
                 description: `Random event ${i + 1} for this month`,
-                meetingLink: Math.random() > 0.5 ? `https://meet.example.com/${i + 1}` : undefined
+                meetingLink: Math.random() > 0.5 ? `https://meet.example.com/${i + 1}` : undefined,
+                host: `Host ${i + 1}`,
+                hostEmail: `host${i + 1}@example.com`,
+                invitee: `Invitee ${i + 1}`,
+                inviteeEmail: `invitee${i + 1}@example.com`
             });
         }
     }
@@ -209,7 +217,11 @@ export const generateRandomEvents = (): Event[] => {
                 color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
                 status: EVENT_STATUSES[Math.floor(Math.random() * EVENT_STATUSES.length)],
                 description: `Random event ${i + 1} for this week`,
-                meetingLink: Math.random() > 0.5 ? `https://meet.example.com/week-${i + 1}` : undefined
+                meetingLink: Math.random() > 0.5 ? `https://meet.example.com/week-${i + 1}` : undefined,
+                host: `Host ${i + 1}`,
+                hostEmail: `host${i + 1}@example.com`,
+                invitee: `Invitee ${i + 1}`,
+                inviteeEmail: `invitee${i + 1}@example.com`
             });
         }
     }

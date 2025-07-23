@@ -119,6 +119,10 @@
   body {
     @apply bg-background text-foreground;
   }
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
 }
 
 html,
@@ -127,8 +131,16 @@ body,
   height: 100%;
 }
 
-
 body {
   height: 100%;
   box-sizing: border-box;
+}
+
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

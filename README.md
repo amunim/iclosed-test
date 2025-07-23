@@ -1,5 +1,8 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Submission to iClosed test 
+Figma design: https://www.figma.com/design/tyMi9XWMD9rr61Lo5gyjXT/IClosed-Test?node-id=0-1&p=f&t=ZxrAyD1APbFMtXbh-0
+
 ## Getting Started
 
 First, run the development server:
