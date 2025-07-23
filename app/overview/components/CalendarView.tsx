@@ -1,33 +1,15 @@
 'use client';
 
-import { useCalendarStore } from '@/lib/store';
-import { format, addDays, startOfDay, setHours } from 'date-fns';
+import { useCalendarStore, useAvailabilityStore } from '@/lib/store';
+import { format, addDays } from 'date-fns';
 import { differenceInCalendarDays } from 'date-fns';
 import { useMemo } from 'react';
-
-// Function to determine cell color based on time range
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function getCellColor(start: Date, end: Date): string {
-    // Sample logic - you can modify this based on your requirements
-    const hour = start.getHours();
-    const dayOfWeek = start.getDay();
-
-    // You can use 'end' parameter for duration-based logic if needed
-    // const duration = end.getTime() - start.getTime();
-
-    // Example: weekends are gray, business hours (9-17) are white, others are gray
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-        return 'bg-gray-200';
-    }
-    if (hour >= 9 && hour < 17) {
-        return 'bg-white';
-    }
-    return 'bg-gray-100';
-}
+import { getUnavailabilityInfo } from '@/lib/utils/calendar';
 
 export default function CalendarView() {
     const { startDate, endDate } = useCalendarStore();
-    const timeSlots = Array.from({ length: 13 }, (_, i) => i + 9);
+    const { weekDays, blockedTimes } = useAvailabilityStore();
+    const timeSlots = Array.from({ length: 24 }, (_, i) => i + 9);
     const daysCount = useMemo(() =>
         startDate && endDate
             ? Math.max(1, differenceInCalendarDays(endDate, startDate) + 1)
@@ -37,53 +19,94 @@ export default function CalendarView() {
     );
 
     return (
-        <div className='overflow-scroll w-full max-w-full'>
-            <div className="flex flex-col max-h-full max-w-full">
-                {/* Header row */}
-                <div className="flex">
-                    <div className="min-w-20 p-2 border-b border-gray-300"></div> {/* Empty cell for time column */}
+        <div>
+            <div className="relative">
+                <div className="absolute top-0 left-0 overflow-hidden bg-white">
+                    <div className="flex flex-col sticky">
+                        <div className="h-10 min-w-20 p-2 border-b border-gray-300 sticky top-0 left-0 bg-white z-20"></div> {/* Top-left empty cell */}
 
-                    {days.map((day, index) => (
-                        <div
-                            key={index}
-                            className="min-w-42 p-2 border-b border-r border-gray-300 text-center flex-1 text-black"
-                        >
-                            {format(day, 'EEE dd').toUpperCase()}
+                        {/* Time rows */}
+                        {timeSlots.map((hour) => (
+                            <div key={hour} className="flex w-20 h-12">
+                                {/* Time column */}
+                                <div className="w-20 border-gray-300 border-r text-sm font-medium text-gray-600 flex items-center justify-end -mb-12 sticky left-0 z-20">
+                                    {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}&nbsp;&nbsp;&nbsp;
+                                    <div className='w-4'>
+                                        <svg className="text-gray-600" width="100%" height="1" xmlns="http://www.w3.org/2000/svg">
+                                            <line x1="0" y1="1" x2="100%" y2="1" stroke="oklch(87.2% 0.01 258.338)" strokeWidth="2" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            {/* Horizontal scroll */}
+            <div className='overflow-x-auto'>
+                <div className="flex flex-col">
+                    {/* Header row */}
+                    <div className="flex">
+                        {/* Empty first cell */}
+                        <div className="min-w-20 w-20 h-10 p-2 border-l border-gray-300 top-0 left-0 bg-white -z-10"></div>
+
+                        {days.map((day, index) => (
+                            <div
+                                key={index}
+                                className="h-10 min-w-42 p-2 border-b border-r border-gray-300 text-center flex-1 text-black sticky top-0 bg-white z-10"
+                            >
+                                {format(day, 'EEE dd').toUpperCase()}
+                            </div>
+                        ))}
+                    </div>
+
+
+                    {/* Time rows */}
+                    {timeSlots.map((hour) => (
+                        <div key={hour} className="flex">
+                            {/* Empty time column same size as first column to leave space (offset) */}
+                            <div className="min-w-20 w-20 h-12 p-2 border-l border-gray-300 sticky top-0 left-0 bg-white -z-10"></div>
+
+                            {/* Day cells */}
+                            {days.map((day, dayIndex) => {
+                                const unavailabilityInfo = getUnavailabilityInfo(day, hour-1, weekDays, blockedTimes);
+                                const colorClass = 'bg-white';
+
+                                return (
+                                    <div
+                                        key={`${hour}-${dayIndex}`}
+                                        className={`min-w-42 h-12 p-1 border-b border-r border-gray-300 flex-1 ${colorClass} relative`}
+                                    >
+                                        {/* Gray overlay for unavailable time */}
+                                        {unavailabilityInfo.percentage > 0 && (
+                                            <div 
+                                                className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 ${
+                                                    (unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime) 
+                                                        ? 'diagonal-lines' 
+                                                        : ''
+                                                }`}
+                                                style={{ 
+                                                    height: `${unavailabilityInfo.percentage}%`,
+                                                    width: '100%',
+                                                    ...(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime) && {
+                                                        backgroundImage: `repeating-linear-gradient(
+                                                            135deg,
+                                                            transparent,
+                                                            transparent 6px,
+                                                            rgba(0, 0, 0, 0.3) 8px,
+                                                            rgba(0, 0, 0, 0.3) 9px
+                                                        )`
+                                                    }
+                                                }}
+                                            />
+                                        )}
+                                        {/* Cell content can go here */}
+                                    </div>
+                                );
+                            })}
                         </div>
                     ))}
                 </div>
-
-                {/* Time rows */}
-                {timeSlots.map((hour) => (
-                    <div key={hour} className="flex">
-                        {/* Time column */}
-                        <div className="min-w-20 border-gray-300 border-x text-sm font-medium text-gray-600 flex items-center justify-end -mb-12">
-                            {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}&nbsp;&nbsp;&nbsp;
-                            <div className='w-4'>
-                                <svg className="text-gray-600" width="100%" height="1" xmlns="http://www.w3.org/2000/svg">
-                                    <line x1="0" y1="1" x2="100%" y2="1" stroke="oklch(87.2% 0.01 258.338)" strokeWidth="2" />
-                                </svg>
-                            </div>
-
-                        </div>
-
-                        {/* Day cells */}
-                        {days.map((day, dayIndex) => {
-                            const cellStart = setHours(startOfDay(day), hour);
-                            const cellEnd = setHours(startOfDay(day), hour + 1);
-                            const colorClass = getCellColor(cellStart, cellEnd);
-
-                            return (
-                                <div
-                                    key={`${hour}-${dayIndex}`}
-                                    className={`min-w-42 h-12 p-1 border-b border-r border-gray-300 flex-1 ${colorClass}`}
-                                >
-                                    {/* Cell content can go here */}
-                                </div>
-                            );
-                        })}
-                    </div>
-                ))}
             </div>
         </div>
     );

@@ -3,10 +3,10 @@
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
-import { ChevronLeft, ChevronRight, Globe } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCalendarStore } from '@/lib/store'
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { SelectRangeEventHandler } from 'react-day-picker'
+import TimezoneSelect from '@/components/TimezoneSelect'
 
 export default function CalendarDateRangeHeader() {
     const { startDate, endDate, setStartDate, setEndDate } = useCalendarStore()
@@ -58,31 +58,7 @@ export default function CalendarDateRangeHeader() {
             </div>
 
 
-            <Select>
-                <SelectTrigger className="text-black cursor-pointer">
-                    <>
-                        <Globe className="h-4 w-4" />
-                        USA - Pacific time 12:00
-                    </>
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="us">
-                        <>
-                            <Globe className="h-4 w-4" /> USA - Pacific time 12:00
-                        </>
-                    </SelectItem>
-                    <SelectItem value="pk">
-                        <>
-                            <Globe className="h-4 w-4" /> USA - Pacific time 12:00
-                        </>
-                    </SelectItem>
-                    <SelectItem value="uk">
-                        <>
-                            <Globe className="h-4 w-4" /> USA - Pacific time 12:00
-                        </>
-                    </SelectItem>
-                </SelectContent>
-            </Select>
+            <TimezoneSelect />
         </header>
     )
 }

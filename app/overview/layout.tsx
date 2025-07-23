@@ -10,10 +10,10 @@ export default function RootLayout({
 }>) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   return (
-        <div className="min-h-screen">
+        <div className="">
           <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
           <main className={`transition-all duration-300 ${sidebarCollapsed ? "ml-14" : "ml-64"}`}>
-            <div className="flex">
+            <div className="flex h-full">
               {children}
             </div>
           </main>

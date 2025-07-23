@@ -1,12 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 
@@ -16,7 +15,7 @@ const CalendarOptions = () => {
     const [calendar2, setCalendar2] = useState(true)
 
     return (
-        <div className={cn("max-w-sm border-l bg-white pb-6 shadow-sm text-gray-600 min-h-screen transition-all", isOpen ? "min-w-fit" : "min-w-14")}>
+        <div className={cn("max-w-sm border-l border-r bg-white pb-6 shadow-sm text-gray-600 min-h-screen transition-all", isOpen ? "min-w-fit" : "min-w-14")}>
             <div className="flex items-center justify-start border-b h-[66px]">
                 <Button variant="ghost" size="icon" onClick={() => setIsOpen(!isOpen)} className="cursor-pointer">
                     {isOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
