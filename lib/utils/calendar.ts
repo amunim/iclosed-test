@@ -11,6 +11,8 @@ export interface UnavailabilityInfo {
     percentage: number;
     hasBreakTime: boolean;
     hasBlockedTime: boolean;
+    breakTimes?: DateRange[];
+    blockedTimes?: DateRange[];
 }
 
 /**
@@ -37,6 +39,8 @@ export const getUnavailabilityInfo = (
     let unavailableMinutes = 0;
     let hasBreakTime = false;
     let hasBlockedTime = false;
+    const affectedBreakTimes: DateRange[] = [];
+    const affectedBlockedTimes: DateRange[] = [];
     
     // If no availability defined for this day, it's 100% unavailable
     if (!dayAvailability) {
@@ -62,6 +66,7 @@ export const getUnavailabilityInfo = (
             const overlapEnd = Math.min(hour + 1, breakEnd);
             unavailableMinutes += (overlapEnd - overlapStart) * 60;
             hasBreakTime = true;
+            affectedBreakTimes.push(breakTime);
         }
     });
 
@@ -77,9 +82,21 @@ export const getUnavailabilityInfo = (
             const overlapMinutes = (overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60);
             unavailableMinutes += overlapMinutes;
             hasBlockedTime = true;
+            affectedBlockedTimes.push(blockedTime);
         }
     });
 
     const percentage = Math.min(100, (unavailableMinutes / 60) * 100);
-    return { percentage, hasBreakTime, hasBlockedTime };
+    
+    const result: UnavailabilityInfo = { percentage, hasBreakTime, hasBlockedTime };
+    
+    if (hasBreakTime) {
+        result.breakTimes = affectedBreakTimes;
+    }
+    
+    if (hasBlockedTime) {
+        result.blockedTimes = affectedBlockedTimes;
+    }
+    
+    return result;
 };

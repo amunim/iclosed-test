@@ -8,15 +8,17 @@ import { getUnavailabilityInfo } from '@/lib/utils/calendar';
 import { getEventsInSlot } from '@/lib/utils/events';
 import { EventCard } from '@/components/EventCard';
 import { useDraggable } from "react-use-draggable-scroll";
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function CalendarView() {
     const { startDate, endDate, timezone } = useCalendarStore();
     const { weekDays, blockedTimes } = useAvailabilityStore();
+    console.table(weekDays);
     const ref = useRef<HTMLDivElement>(null) as React.MutableRefObject<HTMLDivElement>;
     const { events: dragEvents } = useDraggable(ref);
 
     const { events } = useEventsStore();
-    const timeSlots = Array.from({ length: 24 }, (_, i) => i + 9);
+    const timeSlots = useMemo(() => Array.from({ length: 24 }, (_, i) => i + 9), []);
     const daysCount = useMemo(() =>
         startDate && endDate
             ? Math.max(1, differenceInCalendarDays(endDate, startDate) + 1)
@@ -30,7 +32,7 @@ export default function CalendarView() {
     const currentHour = now.getHours();
     const currentMinutes = now.getMinutes();
     const currentTimePercentage = (currentMinutes / 60) * 100; // Percentage of the hour passed
-    const todayIndex = days.findIndex(day => 
+    const todayIndex = days.findIndex(day =>
         format(day, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd')
     );
     const shouldShowCurrentTimeIndicator = todayIndex !== -1 && currentHour >= 9 && currentHour < 33;
@@ -73,7 +75,7 @@ export default function CalendarView() {
                             const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
                             const dayText = format(day, 'EEE dd').toUpperCase();
                             const [dayName, dayNumber] = dayText.split(' ');
-                            
+
                             return (
                                 <div
                                     key={index}
@@ -100,7 +102,8 @@ export default function CalendarView() {
                             {days.map((day, dayIndex) => {
                                 const unavailabilityInfo = getUnavailabilityInfo(day, hour - 1, weekDays, blockedTimes);
                                 const colorClass = 'bg-white';
-                                const eventsInSlot = getEventsInSlot(events, day, hour, timezone);
+                                const eventsInSlot = getEventsInSlot(events, day, hour - 1, timezone);
+                                const dayText = format(day, 'eee, do');
 
                                 return (
                                     <div
@@ -109,25 +112,63 @@ export default function CalendarView() {
                                     >
                                         {/* Gray overlay for unavailable time */}
                                         {unavailabilityInfo.percentage > 0 && (
-                                            <div
-                                                className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 -z-10 ${(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime)
-                                                    ? 'diagonal-lines'
-                                                    : ''
-                                                    }`}
-                                                style={{
-                                                    height: `${unavailabilityInfo.percentage}%`,
-                                                    width: '100%',
-                                                    ...(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime) && {
-                                                        backgroundImage: `repeating-linear-gradient(
+
+                                            <Tooltip delayDuration={0}>
+                                                <TooltipTrigger asChild>
+                                                    <div
+                                                        className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 -z-10 ${(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime)
+                                                            ? 'diagonal-lines'
+                                                            : ''
+                                                            }`}
+                                                        style={{
+                                                            height: `${unavailabilityInfo.percentage}%`,
+                                                            width: '100%',
+                                                            ...(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime) && {
+                                                                backgroundImage: `repeating-linear-gradient(
                                                             135deg,
                                                             transparent,
                                                             transparent 6px,
                                                             rgba(0, 0, 0, 0.3) 8px,
                                                             rgba(0, 0, 0, 0.3) 9px
                                                         )`
-                                                    }
-                                                }}
-                                            />
+                                                            }
+                                                        }}
+                                                    />
+                                                </TooltipTrigger>
+                                                <TooltipContent
+                                                    align="end"
+                                                    side='bottom'
+                                                    hideWhenDetached
+                                                    className='bg-gray-900 no-arrow text-md'
+                                                    style={{
+                                                        padding: "4px 8px",
+                                                        borderRadius: 8,
+                                                        boxShadow: "1px 1px 3px #888",
+                                                    }}
+                                                >
+                                                    {!unavailabilityInfo.hasBreakTime && !unavailabilityInfo.hasBlockedTime && <>
+                                                        {dayText} availability: <br /> {`${weekDays.findIndex(wd => wd.day === day.getDay()) !== -1 ? (format(weekDays.filter(wd => wd.day === day.getDay())?.[0]?.availability.from, 'hh a') + ' - ' + format(weekDays.filter(wd => wd.day === day.getDay())?.[0]?.availability.to, 'hh a')) : ' - '}`}
+                                                    </>}
+                                                    {unavailabilityInfo.hasBreakTime && unavailabilityInfo.breakTimes && <>
+                                                        {unavailabilityInfo.breakTimes.map((breakTime, index) => (
+                                                            <div key={index}>
+                                                                Break Time: <br />
+                                                                {format(breakTime.from, 'h a')} - {format(breakTime.to, 'h a')}
+                                                                {index < unavailabilityInfo.breakTimes!.length - 1 && <br />}
+                                                            </div>
+                                                        ))}
+                                                    </>}
+                                                    {unavailabilityInfo.hasBlockedTime && unavailabilityInfo.blockedTimes && <>
+                                                        {unavailabilityInfo.blockedTimes.map((blockedTime, index) => (
+                                                            <div key={index}>
+                                                                Blocked Time: <br />
+                                                                {format(blockedTime.from, 'h a')} - {format(blockedTime.to, 'h a')}
+                                                                {index < unavailabilityInfo.blockedTimes!.length - 1 && <br />}
+                                                            </div>
+                                                        ))}
+                                                    </>}
+                                                </TooltipContent>
+                                            </Tooltip>
                                         )}
                                         {/* Event cards */}
                                         {eventsInSlot.map((eventInfo, eventIndex) => {
@@ -159,26 +200,26 @@ export default function CalendarView() {
                                                 </div>
                                             );
                                         })}
-                                        
+
                                         {/* Current time indicator */}
-                                        {shouldShowCurrentTimeIndicator && 
-                                         dayIndex === todayIndex && 
-                                         hour === currentHour && (
-                                            <div
-                                                className="absolute z-20"
-                                                style={{
-                                                    top: `${currentTimePercentage}%`,
-                                                    left: 0,
-                                                    right: 0,
-                                                    transform: 'translateY(-50%)'
-                                                }}
-                                            >
-                                                <svg width="132" height="8" viewBox="0 0 132 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <circle cx="4" cy="4" r="4" fill="#E02424"/>
-                                                    <path d="M8 4H131" stroke="#E02424" strokeWidth="2" strokeLinecap="round"/>
-                                                </svg>
-                                            </div>
-                                        )}
+                                        {shouldShowCurrentTimeIndicator &&
+                                            dayIndex === todayIndex &&
+                                            hour === (currentHour + 1) && (
+                                                <div
+                                                    className="absolute z-20"
+                                                    style={{
+                                                        top: `${currentTimePercentage}%`,
+                                                        left: 0,
+                                                        right: 0,
+                                                        transform: 'translateY(-50%)'
+                                                    }}
+                                                >
+                                                    <svg width="132" height="8" viewBox="0 0 132 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <circle cx="4" cy="4" r="4" fill="#E02424" />
+                                                        <path d="M8 4H131" stroke="#E02424" strokeWidth="2" strokeLinecap="round" />
+                                                    </svg>
+                                                </div>
+                                            )}
                                     </div>
                                 );
                             })}

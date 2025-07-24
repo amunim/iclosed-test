@@ -13,7 +13,7 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command'
-import { Globe } from 'lucide-react'
+import { ChevronDown, Globe } from 'lucide-react'
 import { useState } from 'react'
 import { useCalendarStore } from '@/lib/store'
 
@@ -122,6 +122,7 @@ export default function TimezoneSelect() {
                             )}</span></>
                             : 'Select Timezone'}
                     </div>
+                    <ChevronDown className="ml-auto h-4 w-4" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[400px] p-0">

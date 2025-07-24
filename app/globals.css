@@ -144,3 +144,7 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+.no-arrow span {
+  display: none;
+}
