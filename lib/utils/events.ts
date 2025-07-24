@@ -1,4 +1,5 @@
 import { DateRange } from '../utils';
+import { WeekDayAvailability } from './calendar';
 
 export interface Event {
     id: string;
@@ -340,3 +341,150 @@ export function getEventsInSlot(events: Event[], day: Date, hour: number, timezo
       };
     });
 }
+
+// Helper function to check if a drop target is valid
+export const isValidDropTarget = (
+    day: Date,
+    hour: number,
+    quarter: number,
+    eventDuration: number, // in minutes
+    weekDays: WeekDayAvailability[],
+    blockedTimes: DateRange[],
+    events: Event[],
+    timezone: string = 'Asia/Karachi',
+    draggedEventId?: string
+): boolean => {
+    // Calculate the exact time for the drop in the display timezone
+    const dropTime = new Date(day);
+    dropTime.setHours(hour, quarter * 15, 0, 0);
+    
+    const eventEndTime = new Date(dropTime.getTime() + eventDuration * 60 * 1000);
+    
+    // Convert events to the display timezone for comparison
+    const convertedEvents = events.map(event => convertEventToTimezone(event, timezone));
+    
+    // Check if the time slots are within working hours and not blocked
+    const currentTime = new Date(dropTime);
+    while (currentTime < eventEndTime) {
+        const currentHour = currentTime.getHours();
+        const currentDay = currentTime.getDay();
+        
+        // Find availability for this day
+        const dayAvailability = weekDays.find(wd => wd.day === currentDay);
+        if (!dayAvailability) return false;
+        
+        const availableFrom = dayAvailability.availability.from.getHours();
+        const availableTo = dayAvailability.availability.to.getHours();
+        
+        // Check if current time is within working hours
+        if (currentHour < availableFrom || currentHour >= availableTo) {
+            return false;
+        }
+        
+        // Check for break times
+        if (dayAvailability.breakTimes) {
+            for (const breakTime of dayAvailability.breakTimes) {
+                const breakStart = new Date(currentTime);
+                breakStart.setHours(breakTime.from.getHours(), breakTime.from.getMinutes(), 0, 0);
+                const breakEnd = new Date(currentTime);
+                breakEnd.setHours(breakTime.to.getHours(), breakTime.to.getMinutes(), 0, 0);
+                
+                if (currentTime >= breakStart && currentTime < breakEnd) {
+                    return false;
+                }
+            }
+        }
+        
+        // Check blocked times (convert to display timezone)
+        for (const blockedTime of blockedTimes) {
+            // Convert blocked time to display timezone
+            const getTimezoneOffset = (tz: string): number => {
+                const timezoneOffsets: Record<string, number> = {
+                    'UTC': 0,
+                    'America/New_York': -5,
+                    'America/Chicago': -6,
+                    'America/Denver': -7,
+                    'America/Los_Angeles': -8,
+                    'Europe/London': 0,
+                    'Europe/Paris': 1,
+                    'Asia/Tokyo': 9,
+                    'Asia/Karachi': 5,
+                    'Asia/Jakarta': 7,
+                    'Asia/Bali': 8,
+                };
+                return timezoneOffsets[tz] || 5;
+            };
+            
+            const offsetMs = getTimezoneOffset(timezone) * 60 * 60 * 1000;
+            const blockedStart = new Date(blockedTime.from.getTime() + offsetMs);
+            const blockedEnd = new Date(blockedTime.to.getTime() + offsetMs);
+            
+            if (currentTime >= blockedStart && currentTime < blockedEnd) {
+                return false;
+            }
+        }
+        
+        // Check for conflicting events (excluding the dragged event)
+        for (const event of convertedEvents) {
+            if (draggedEventId && event.id === draggedEventId) continue;
+            if (event.status !== 'busy') continue; // Only busy events block the slot
+            
+            if (currentTime >= event.time.from && currentTime < event.time.to) {
+                return false;
+            }
+        }
+        
+        // Move to next 15-minute slot
+        currentTime.setMinutes(currentTime.getMinutes() + 15);
+    }
+    
+    return true;
+};
+
+// Helper function to reschedule an event with proper timezone handling
+export const rescheduleEvent = (
+    event: Event,
+    newDay: Date,
+    newHour: number,
+    newQuarter: number,
+    timezone: string = 'Asia/Karachi'
+): Event => {
+    const originalDuration = event.time.to.getTime() - event.time.from.getTime();
+    
+    // Create the new start time in the specified timezone
+    const newStartTime = new Date(newDay);
+    newStartTime.setHours(newHour, newQuarter * 15, 0, 0);
+    
+    // Convert from display timezone to UTC (reverse the timezone conversion)
+    const getTimezoneOffset = (tz: string): number => {
+        const timezoneOffsets: Record<string, number> = {
+            'UTC': 0,
+            'America/New_York': -5,
+            'America/Chicago': -6,
+            'America/Denver': -7,
+            'America/Los_Angeles': -8,
+            'Europe/London': 0,
+            'Europe/Paris': 1,
+            'Asia/Tokyo': 9,
+            'Asia/Karachi': 5,
+            'Asia/Jakarta': 7,
+            'Asia/Bali': 8,
+        };
+        return timezoneOffsets[tz] || 5;
+    };
+    
+    const offsetHours = getTimezoneOffset(timezone);
+    const offsetMs = offsetHours * 60 * 60 * 1000;
+    
+    // Convert the display time back to UTC for storage
+    const utcStartTime = new Date(newStartTime.getTime() - offsetMs);
+    const utcEndTime = new Date(utcStartTime.getTime() + originalDuration);
+    
+    return {
+        ...event,
+        time: {
+            from: utcStartTime,
+            to: utcEndTime
+        }
+    };
+};
