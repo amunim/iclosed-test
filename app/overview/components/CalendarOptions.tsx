@@ -21,7 +21,7 @@ const CalendarOptions = () => {
     const [tooltipOpen, setTooltipOpen] = useState(false)
 
     return (
-        <div className={cn("max-w-sm border-l border-r bg-white pb-6 shadow-sm text-gray-600 min-h-screen transition-all", isOpen ? "min-w-fit" : "min-w-14")}>
+        <div className={cn("max-w-sm border-l border-r bg-white pb-6 shadow-sm text-gray-600 min-h-screen transition-all z-50", isOpen ? "min-w-fit" : "min-w-14")}>
             <div className="flex items-center justify-start border-b h-[66px]">
                 <Button variant="ghost" size="icon" onClick={() => setIsOpen(!isOpen)} className="cursor-pointer">
                     {isOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}

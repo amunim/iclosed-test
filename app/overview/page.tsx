@@ -1,13 +1,13 @@
 "use client";
 
-import { MutableRefObject, useRef } from 'react';
+import { useRef } from 'react';
 import CalendarDateRangeHeader from "./components/CalendarDateRangeHeader";
 import CalendarOptions from "./components/CalendarOptions";
 import CalendarView from "./components/CalendarView";
 import { useDraggable } from "react-use-draggable-scroll";
 
 export default function OverviewPage() {
-    const ref = useRef<HTMLDivElement>(null) as React.MutableRefObject<HTMLDivElement>;
+    const ref = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
     const { events: dragEvents } = useDraggable(ref);
 
     return (
@@ -18,7 +18,7 @@ export default function OverviewPage() {
                 {/* Vertical scroll here */}
                 <div
                     ref={ref}
-                    className="flex-1 overflow-y-auto scrollbar-hide select-none"
+                    className="flex-1 overflow-y-auto scrollbar-hide select-none relative"
                     {...dragEvents}>
                     <CalendarView />
                 </div>

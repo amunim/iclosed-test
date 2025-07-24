@@ -9,13 +9,19 @@ import { getEventsInSlot } from '@/lib/utils/events';
 import { EventCard } from '@/components/EventCard';
 import { useDraggable } from "react-use-draggable-scroll";
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useStickyRowSync } from '@/lib/hooks/useStickyRowSync';
 
 export default function CalendarView() {
     const { startDate, endDate, timezone } = useCalendarStore();
     const { weekDays, blockedTimes } = useAvailabilityStore();
-    console.table(weekDays);
-    const ref = useRef<HTMLDivElement>(null) as React.MutableRefObject<HTMLDivElement>;
-    const { events: dragEvents } = useDraggable(ref);
+    const horizontalScrollRef = useRef<HTMLDivElement>(null) as React.MutableRefObject<HTMLDivElement>;
+    const stickyRowRefHeader = useStickyRowSync({
+        horizontalScrollRef: horizontalScrollRef,
+    });
+    const stickyRowRefFooter = useStickyRowSync({
+        horizontalScrollRef: horizontalScrollRef,
+    });
+    const { events: dragEvents } = useDraggable(horizontalScrollRef);
 
     const { events } = useEventsStore();
     const timeSlots = useMemo(() => Array.from({ length: 24 }, (_, i) => i + 9), []);
@@ -37,9 +43,49 @@ export default function CalendarView() {
     );
     const shouldShowCurrentTimeIndicator = todayIndex !== -1 && currentHour >= 9 && currentHour < 33;
 
+    // Calculate available slots for each day
+    const calculateAvailableSlots = (day: Date): number => {
+        let availableSlots = 0;
+        
+        // Get the day of week (0 = Sunday, 1 = Monday, etc.)
+        const dayOfWeek = day.getDay();
+        
+        // Find availability for this specific day
+        const dayAvailability = weekDays.find(wd => wd.day === dayOfWeek);
+        
+        // If no availability defined for this day, return 0
+        if (!dayAvailability) {
+            return 0;
+        }
+        
+        // Get the available hours from the day's availability
+        const startHour = dayAvailability.availability.from.getHours();
+        const endHour = dayAvailability.availability.to.getHours();
+        
+        // Check each hour slot within the day's availability
+        for (let hour = startHour; hour < endHour; hour++) {
+            const unavailabilityInfo = getUnavailabilityInfo(day, hour, weekDays, blockedTimes);
+            const eventsInSlot = getEventsInSlot(events, day, hour, timezone);
+            
+            // If slot is fully unavailable due to working hours/breaks/blocks, skip it
+            if (unavailabilityInfo.percentage >= 100) continue;
+            
+            // Check if there are any 'busy' events in this slot
+            const hasBusyEvent = eventsInSlot.some(eventInfo => eventInfo.event.status === 'busy');
+            
+            // If no busy events, this slot is available
+            // (available events don't block the slot)
+            if (!hasBusyEvent) {
+                availableSlots++;
+            }
+        }
+        
+        return availableSlots;
+    };
+
     return (
-        <div>
-            <div className="relative">
+        <div className='sticky top-0 z-20'>
+            <div className="absolute top-0">
                 <div className="absolute top-0 left-0 overflow-hidden bg-white z-20">
                     <div className="flex flex-col sticky">
                         <div className="h-12 min-w-20 p-2 border-b border-gray-300 sticky top-0 left-0 bg-white z-20"></div> {/* Top-left empty cell */}
@@ -63,13 +109,13 @@ export default function CalendarView() {
             </div>
             {/* Horizontal scroll */}
             <div className='overflow-x-auto scrollbar-hide'
-                ref={ref}
+                ref={horizontalScrollRef}
                 {...dragEvents}>
                 <div className="flex flex-col">
                     {/* Header row */}
-                    <div className="flex">
+                    <div className="flex fixed z-10 top-[66px]" ref={stickyRowRefHeader}>
                         {/* Empty first cell */}
-                        <div className="min-w-20 w-20 h-12 p-2 border-l border-gray-300 top-0 left-0 bg-white -z-10"></div>
+                        <div className="min-w-20 w-20 h-12 p-2 border-l border-b border-gray-300 top-0 left-0 bg-white -z-10"></div>
 
                         {days.map((day, index) => {
                             const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
@@ -91,140 +137,161 @@ export default function CalendarView() {
                         })}
                     </div>
 
+                    {/* pt-12 accounting for the fixed header row */}
+                    <div className="pt-12">
+                        {/* Time rows */}
+                        {timeSlots.map((hour) => (
+                            <div key={hour} className="flex">
+                                {/* Empty time column same size as first column to leave space (offset) */}
+                                <div className="min-w-20 w-20 h-12 p-2 border-l border-gray-300 sticky top-0 left-0 bg-white -z-10"></div>
 
-                    {/* Time rows */}
-                    {timeSlots.map((hour) => (
-                        <div key={hour} className="flex">
-                            {/* Empty time column same size as first column to leave space (offset) */}
-                            <div className="min-w-20 w-20 h-12 p-2 border-l border-gray-300 sticky top-0 left-0 bg-white -z-10"></div>
+                                {/* Day cells */}
+                                {days.map((day, dayIndex) => {
+                                    const unavailabilityInfo = getUnavailabilityInfo(day, hour - 1, weekDays, blockedTimes);
+                                    const colorClass = 'bg-white';
+                                    const eventsInSlot = getEventsInSlot(events, day, hour - 1, timezone);
+                                    const dayText = format(day, 'eee, do');
 
-                            {/* Day cells */}
-                            {days.map((day, dayIndex) => {
-                                const unavailabilityInfo = getUnavailabilityInfo(day, hour - 1, weekDays, blockedTimes);
-                                const colorClass = 'bg-white';
-                                const eventsInSlot = getEventsInSlot(events, day, hour - 1, timezone);
-                                const dayText = format(day, 'eee, do');
+                                    return (
+                                        <div
+                                            key={`${hour}-${dayIndex}`}
+                                            className={`min-w-42 h-16 p-1 pl-0 border-b border-r border-gray-300 flex-1 ${colorClass} relative z-0`}
+                                        >
+                                            {/* Gray overlay for unavailable time */}
+                                            {unavailabilityInfo.percentage > 0 && (
 
-                                return (
-                                    <div
-                                        key={`${hour}-${dayIndex}`}
-                                        className={`min-w-42 h-16 p-1 pl-0 border-b border-r border-gray-300 flex-1 ${colorClass} relative z-0`}
-                                    >
-                                        {/* Gray overlay for unavailable time */}
-                                        {unavailabilityInfo.percentage > 0 && (
-
-                                            <Tooltip delayDuration={0}>
-                                                <TooltipTrigger asChild>
-                                                    <div
-                                                        className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 -z-10 ${(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime)
-                                                            ? 'diagonal-lines'
-                                                            : ''
-                                                            }`}
-                                                        style={{
-                                                            height: `${unavailabilityInfo.percentage}%`,
-                                                            width: '100%',
-                                                            ...(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime) && {
-                                                                backgroundImage: `repeating-linear-gradient(
+                                                <Tooltip delayDuration={0}>
+                                                    <TooltipTrigger asChild>
+                                                        <div
+                                                            className={`absolute inset-x-0 top-0 bg-gray-300 opacity-60 -z-10 ${(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime)
+                                                                ? 'diagonal-lines'
+                                                                : ''
+                                                                }`}
+                                                            style={{
+                                                                height: `${unavailabilityInfo.percentage}%`,
+                                                                width: '100%',
+                                                                ...(unavailabilityInfo.hasBreakTime || unavailabilityInfo.hasBlockedTime) && {
+                                                                    backgroundImage: `repeating-linear-gradient(
                                                             135deg,
                                                             transparent,
                                                             transparent 6px,
                                                             rgba(0, 0, 0, 0.3) 8px,
                                                             rgba(0, 0, 0, 0.3) 9px
                                                         )`
-                                                            }
+                                                                }
+                                                            }}
+                                                        />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent
+                                                        align="end"
+                                                        side='bottom'
+                                                        hideWhenDetached
+                                                        className='bg-gray-900 no-arrow text-md'
+                                                        style={{
+                                                            padding: "4px 8px",
+                                                            borderRadius: 8,
+                                                            boxShadow: "1px 1px 3px #888",
                                                         }}
-                                                    />
-                                                </TooltipTrigger>
-                                                <TooltipContent
-                                                    align="end"
-                                                    side='bottom'
-                                                    hideWhenDetached
-                                                    className='bg-gray-900 no-arrow text-md'
-                                                    style={{
-                                                        padding: "4px 8px",
-                                                        borderRadius: 8,
-                                                        boxShadow: "1px 1px 3px #888",
-                                                    }}
-                                                >
-                                                    {!unavailabilityInfo.hasBreakTime && !unavailabilityInfo.hasBlockedTime && <>
-                                                        {dayText} availability: <br /> {`${weekDays.findIndex(wd => wd.day === day.getDay()) !== -1 ? (format(weekDays.filter(wd => wd.day === day.getDay())?.[0]?.availability.from, 'hh a') + ' - ' + format(weekDays.filter(wd => wd.day === day.getDay())?.[0]?.availability.to, 'hh a')) : ' - '}`}
-                                                    </>}
-                                                    {unavailabilityInfo.hasBreakTime && unavailabilityInfo.breakTimes && <>
-                                                        {unavailabilityInfo.breakTimes.map((breakTime, index) => (
-                                                            <div key={index}>
-                                                                Break Time: <br />
-                                                                {format(breakTime.from, 'h a')} - {format(breakTime.to, 'h a')}
-                                                                {index < unavailabilityInfo.breakTimes!.length - 1 && <br />}
-                                                            </div>
-                                                        ))}
-                                                    </>}
-                                                    {unavailabilityInfo.hasBlockedTime && unavailabilityInfo.blockedTimes && <>
-                                                        {unavailabilityInfo.blockedTimes.map((blockedTime, index) => (
-                                                            <div key={index}>
-                                                                Blocked Time: <br />
-                                                                {format(blockedTime.from, 'h a')} - {format(blockedTime.to, 'h a')}
-                                                                {index < unavailabilityInfo.blockedTimes!.length - 1 && <br />}
-                                                            </div>
-                                                        ))}
-                                                    </>}
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        )}
-                                        {/* Event cards */}
-                                        {eventsInSlot.map((eventInfo, eventIndex) => {
-                                            const topOffset = unavailabilityInfo.percentage > 0
-                                                ? unavailabilityInfo.percentage
-                                                : 0;
-
-                                            const availableHeight = 100 - unavailabilityInfo.percentage;
-                                            const eventHeight = (eventInfo.heightPercentage / 100) * availableHeight;
-                                            const showText = eventInfo.position === 'start' || eventInfo.position === 'full';
-                                            if (topOffset == 100)
-                                                return null;
-
-                                            return (
-                                                <div
-                                                    key={`${eventInfo.event.id}-${eventIndex}`}
-                                                    className="absolute inset-x-1 z-10"
-                                                    style={{
-                                                        top: (topOffset + (showText ? 0 : -1)) + '%',
-                                                        height: `${eventHeight}%`,
-                                                        left: 0,
-                                                        borderTopLeftRadius: eventInfo.position === 'start' || eventInfo.position === 'full' ? '6px' : '0',
-                                                        borderTopRightRadius: eventInfo.position === 'start' || eventInfo.position === 'full' ? '6px' : '0',
-                                                        borderBottomLeftRadius: eventInfo.position === 'end' || eventInfo.position === 'full' ? '6px' : '0',
-                                                        borderBottomRightRadius: eventInfo.position === 'end' || eventInfo.position === 'full' ? '6px' : '0',
-                                                    }}
-                                                >
-                                                    <EventCard event={eventInfo.event} showText={showText} />
-                                                </div>
-                                            );
-                                        })}
-
-                                        {/* Current time indicator */}
-                                        {shouldShowCurrentTimeIndicator &&
-                                            dayIndex === todayIndex &&
-                                            hour === (currentHour + 1) && (
-                                                <div
-                                                    className="absolute z-20"
-                                                    style={{
-                                                        top: `${currentTimePercentage}%`,
-                                                        left: 0,
-                                                        right: 0,
-                                                        transform: 'translateY(-50%)'
-                                                    }}
-                                                >
-                                                    <svg width="132" height="8" viewBox="0 0 132 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                        <circle cx="4" cy="4" r="4" fill="#E02424" />
-                                                        <path d="M8 4H131" stroke="#E02424" strokeWidth="2" strokeLinecap="round" />
-                                                    </svg>
-                                                </div>
+                                                    >
+                                                        {!unavailabilityInfo.hasBreakTime && !unavailabilityInfo.hasBlockedTime && <>
+                                                            {dayText} availability: <br /> {`${weekDays.findIndex(wd => wd.day === day.getDay()) !== -1 ? (format(weekDays.filter(wd => wd.day === day.getDay())?.[0]?.availability.from, 'hh a') + ' - ' + format(weekDays.filter(wd => wd.day === day.getDay())?.[0]?.availability.to, 'hh a')) : ' - '}`}
+                                                        </>}
+                                                        {unavailabilityInfo.hasBreakTime && unavailabilityInfo.breakTimes && <>
+                                                            {unavailabilityInfo.breakTimes.map((breakTime, index) => (
+                                                                <div key={index}>
+                                                                    Break Time: <br />
+                                                                    {format(breakTime.from, 'h a')} - {format(breakTime.to, 'h a')}
+                                                                    {index < unavailabilityInfo.breakTimes!.length - 1 && <br />}
+                                                                </div>
+                                                            ))}
+                                                        </>}
+                                                        {unavailabilityInfo.hasBlockedTime && unavailabilityInfo.blockedTimes && <>
+                                                            {unavailabilityInfo.blockedTimes.map((blockedTime, index) => (
+                                                                <div key={index}>
+                                                                    Blocked Time: <br />
+                                                                    {format(blockedTime.from, 'h a')} - {format(blockedTime.to, 'h a')}
+                                                                    {index < unavailabilityInfo.blockedTimes!.length - 1 && <br />}
+                                                                </div>
+                                                            ))}
+                                                        </>}
+                                                    </TooltipContent>
+                                                </Tooltip>
                                             )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ))}
+                                            {/* Event cards */}
+                                            {eventsInSlot.map((eventInfo, eventIndex) => {
+                                                const topOffset = unavailabilityInfo.percentage > 0
+                                                    ? unavailabilityInfo.percentage
+                                                    : 0;
+
+                                                const availableHeight = 100 - unavailabilityInfo.percentage;
+                                                const eventHeight = (eventInfo.heightPercentage / 100) * availableHeight;
+                                                const showText = eventInfo.position === 'start' || eventInfo.position === 'full';
+                                                if (topOffset == 100)
+                                                    return null;
+
+                                                return (
+                                                    <div
+                                                        key={`${eventInfo.event.id}-${eventIndex}`}
+                                                        className="absolute inset-x-1 z-10"
+                                                        style={{
+                                                            top: (topOffset + (showText ? 0 : -1)) + '%',
+                                                            height: `${eventHeight}%`,
+                                                            left: 0,
+                                                            borderTopLeftRadius: eventInfo.position === 'start' || eventInfo.position === 'full' ? '6px' : '0',
+                                                            borderTopRightRadius: eventInfo.position === 'start' || eventInfo.position === 'full' ? '6px' : '0',
+                                                            borderBottomLeftRadius: eventInfo.position === 'end' || eventInfo.position === 'full' ? '6px' : '0',
+                                                            borderBottomRightRadius: eventInfo.position === 'end' || eventInfo.position === 'full' ? '6px' : '0',
+                                                        }}
+                                                    >
+                                                        <EventCard event={eventInfo.event} showText={showText} />
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {/* Current time indicator */}
+                                            {shouldShowCurrentTimeIndicator &&
+                                                dayIndex === todayIndex &&
+                                                hour === (currentHour + 1) && (
+                                                    <div
+                                                        className="absolute z-20"
+                                                        style={{
+                                                            top: `${currentTimePercentage}%`,
+                                                            left: 0,
+                                                            right: 0,
+                                                            transform: 'translateY(-50%)'
+                                                        }}
+                                                    >
+                                                        <svg width="132" height="8" viewBox="0 0 132 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <circle cx="4" cy="4" r="4" fill="#E02424" />
+                                                            <path d="M8 4H131" stroke="#E02424" strokeWidth="2" strokeLinecap="round" />
+                                                        </svg>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Header row */}
+                    <div className="flex fixed z-10 bottom-0" ref={stickyRowRefFooter}>
+                        {/* Empty first cell */}
+                        <div className="min-w-20 w-20 h-8 p-2 border-l border-t border-gray-300 top-0 left-0 bg-white -z-10"></div>
+
+                        {days.map((day, index) => {
+                            const availableSlots = calculateAvailableSlots(day);
+                            return (
+                                <div
+                                    key={index}
+                                    className={`h-8 min-w-42 p-2 border-b border-r border-gray-300 text-center flex-1 top-0 bg-white z-10`}
+                                >
+                                    <span className='text-muted-foreground'>Available slots: </span>
+                                    <span className='font-semibold'>{availableSlots}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         </div>

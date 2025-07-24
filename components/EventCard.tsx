@@ -58,7 +58,7 @@ export const EventCard = ({ event, showText = true }: { event: Event; showText?:
                     )}
                 </PopoverTrigger >
                 <PopoverPortal>
-                    <PopoverContent side='right' align='center'>
+                    <PopoverContent className='z-100' side='right' align='center'>
                         <EventPopover event={event} closePopover={() => setIsPopoverOpen(false)} />
                     </PopoverContent>
                 </PopoverPortal>
