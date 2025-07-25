@@ -16,16 +16,18 @@ interface EventCardProps {
     hour?: number;
 }
 
-export const EventCard = ({ 
-    event, 
-    showText = true, 
-    isDragging = false, 
+export const EventCard = ({
+    event,
+    showText = true,
+    isDragging = false,
     onDragStart,
     day,
     hour
 }: EventCardProps) => {
     const [isPopoverOpen, setIsPopoverOpen] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
+    const mouseDownTimeRef = useRef<number | null>(null);
+    const dragRef = useRef<NodeJS.Timeout | null>(null);
     const { title, time, meetingLink, color } = event;
 
     const formatTime = (date: Date) => format(date, 'h:mm a');
@@ -34,29 +36,39 @@ export const EventCard = ({
     const borderLeftColor = meetingLink ? '#dadce0' : darkenColor(color, 0.2);
 
     const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-        console.log('EventCard mouseDown triggered', { hasOnDragStart: !!onDragStart, day, hour });
+        mouseDownTimeRef.current = Date.now();
+
         if (onDragStart && cardRef.current && day && hour !== undefined) {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Starting drag for event:', event.title);
-            onDragStart(event, cardRef.current, e.clientX, e.clientY);
+            dragRef.current = setTimeout(() =>
+                cardRef.current && onDragStart(event, cardRef.current, e.clientX, e.clientY)
+                , 300)
         }
     };
 
-    const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        // Only allow popover to open if not dragging
-        if (isDragging) {
-            e.preventDefault();
-            e.stopPropagation();
+    const handleMouseUp = () => {
+        if (dragRef.current) {
+            clearTimeout(dragRef.current);
+            dragRef.current = null;
+        }
+        if (mouseDownTimeRef.current !== null) {
+            const clickDuration = Date.now() - mouseDownTimeRef.current;
+            const isClick = clickDuration < 200; // Consider it a click if less than 200ms
+
+            if (isClick) {
+                setIsPopoverOpen(true);
+            }
+
+            mouseDownTimeRef.current = null;
         }
     };
 
     return (
         <div
             ref={cardRef}
-            className={`event-card w-full h-full overflow-hidden flex items-start px-2 py-1 box-border rounded-[inherit] z-10 ${
-                isDragging ? 'opacity-50 scale-95' : 'cursor-grab active:cursor-grabbing hover:shadow-md'
-            }`}
+            className={`event-card w-full h-full overflow-hidden flex items-start px-2 py-1 box-border rounded-[inherit] z-10 ${isDragging ? 'opacity-50 scale-95' : 'cursor-grab active:cursor-grabbing hover:shadow-md'
+                }`}
             style={{
                 backgroundColor,
                 borderTop: isPopoverOpen ? '2px solid rgba(118, 169, 250, 1)' : '',
@@ -68,14 +80,13 @@ export const EventCard = ({
                 pointerEvents: isDragging ? 'none' : 'auto',
             }}
             onMouseDown={handleMouseDown}
-            onClick={handleClick}
+            onMouseUp={handleMouseUp}
         >
-            <Popover open={!isDragging && isPopoverOpen} onOpenChange={(open) => !isDragging && setIsPopoverOpen(open)}>
+            <Popover open={isPopoverOpen} onOpenChange={(open) => !open ? setIsPopoverOpen(false) : null}>
                 <PopoverTrigger asChild disabled={isDragging}>
                     {showText && (
-                        <div 
-                            className="whitespace-normal overflow-hidden text-ellipsis flex-wrap items-start"
-                            style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+                        <div
+                            className="whitespace-normal overflow-hidden text-ellipsis flex-wrap items-start pointer-events-none"
                         >
                             <div className="font-medium text-sm text-[#202124] overflow-hidden text-ellipsis whitespace-nowrap flex">
                                 {showText && meetingLink && (

@@ -74,14 +74,12 @@ export default function CalendarView() {
 
     // Handle drag start
     const handleDragStart = (event: Event, element: HTMLElement, clientX: number, clientY: number) => {
-        console.log('CalendarView handleDragStart called', event.title);
         // Convert the event to display timezone to get the correct day and hour
         const convertedEvent = convertEventToTimezone(event, timezone);
         const eventDay = new Date(convertedEvent.time.from);
         eventDay.setHours(0, 0, 0, 0);
         const eventHour = convertedEvent.time.from.getHours();
         
-        console.log('Starting drag with:', { eventDay, eventHour, timezone });
         startDrag(event, { day: eventDay, hour: eventHour }, element, clientX, clientY);
     };
 

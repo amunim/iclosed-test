@@ -34,14 +34,12 @@ export const useDragAndDrop = () => {
     const dragElementRef = useRef<HTMLElement | null>(null);
 
     const startDrag = useCallback((event: Event, originalSlot: { day: Date; hour: number }, element: HTMLElement, clientX: number, clientY: number) => {
-        console.log('useDragAndDrop startDrag called', event.title);
         const rect = element.getBoundingClientRect();
         const offset = {
             x: clientX - rect.left,
             y: clientY - rect.top
         };
 
-        console.log('Setting drag state to true');
         setDragState({
             isDragging: true,
             dragData: { event, originalSlot },
