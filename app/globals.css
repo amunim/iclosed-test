@@ -149,6 +149,6 @@ body {
   display: none;
 }
 
-.data-radix-popper-content-wrapper:has( > .z-100) {
-  z-index: 100 !important;
+.data-radix-popper-content-wrapper:has( > .z-50) {
+  z-index: 50 !important;
 }
